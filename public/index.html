@@ -9,10 +9,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/assets/logo.png">
-  <link rel="stylesheet" href="/pet.css?v=20261101e">
+  <link rel="stylesheet" href="/pet.css?v=20261101q">
   <title>鲸鱼娘</title>
 </head>
 <body>
+  <div id="topbar"><time id="clock">--:--</time><div id="top-actions"><button id="config-btn" aria-label="设置">⚙</button><span id="battery" hidden><i class="cell"><i class="fill"></i></i><b>--%</b></span></div></div>
   <div id="bg" aria-hidden="true"></div>
   <div id="glow" aria-hidden="true"></div>
   <div id="stage" aria-hidden="true">
@@ -24,16 +25,15 @@
   <section id="split-status" hidden>
     <header>
       <span id="ss-state" data-state="idle">连接中</span>
-      <div class="ss-title"><b>DEEPSEEK 大肥鱼 · 本机状态</b><span id="ss-session">等待会话…</span></div>
+      <div class="ss-title"><span id="ss-session">等待会话…</span></div>
       <button id="ss-switch" hidden>切换</button>
       <span id="ss-live"><i></i>实时</span>
     </header>
     <div class="ss-body">
       <div class="ss-sec"><label>思考</label><p id="ss-think">正在读取本机会话…</p></div>
-      <div class="ss-sec"><label>执行</label>
+      <div class="ss-sec" id="ss-exec"><label>执行</label>
         <div id="ss-tool" hidden><span class="name"></span><code></code></div>
         <div id="ss-steps" class="ss-steps" hidden></div>
-        <pre id="ss-out" hidden></pre>
         <p id="ss-empty">暂无工具调用</p>
       </div>
     </div>
@@ -56,6 +56,6 @@
   </div>
   <button id="theme-toggle" hidden aria-label="切换背景模式">☾</button>
   <div id="hint">轻点进入全屏</div>
-  <script src="/pet.js?v=20261101e"></script>
+  <script src="/pet.js?v=20261101q"></script>
 </body>
 </html>

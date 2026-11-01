@@ -1,7 +1,11 @@
 package com.dsh.petscreen;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.os.BatteryManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -9,16 +13,23 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.text.InputType;
 import android.webkit.ConsoleMessage;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -62,9 +73,14 @@ public class MainActivity extends Activity {
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private AssetServer assetServer;
+    private SharedPreferences configPrefs;
     private String targetUrl;
     private String baseUrl;
     private String token;
+    private String serverHost;
+    private int serverPort;
+    private boolean whisperOn = true;
+    private String uiTheme = "";
     private long lastUiUpdate = 0L;
 
     @Override
@@ -76,14 +92,25 @@ public class MainActivity extends Activity {
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         if (getActionBar() != null) getActionBar().hide();
 
-        targetUrl = getIntent().getStringExtra("url");
-        if (targetUrl == null || targetUrl.isEmpty()) targetUrl = DEFAULT_URL;
-
-        Uri uri = Uri.parse(targetUrl);
-        baseUrl = uri.getScheme() + "://" + uri.getHost()
-                + (uri.getPort() > 0 ? ":" + uri.getPort() : "");
+        String initialUrl = getIntent().getStringExtra("url");
+        if (initialUrl == null || initialUrl.isEmpty()) initialUrl = DEFAULT_URL;
+        Uri uri = Uri.parse(initialUrl);
+        serverHost = uri.getHost() == null ? "" : uri.getHost();
+        serverPort = uri.getPort() > 0 ? uri.getPort() : 39100;
         token = uri.getQueryParameter("t");
         if (token == null) token = "";
+
+        configPrefs = getSharedPreferences("config", MODE_PRIVATE);
+        String savedHost = configPrefs.getString("host", "");
+        if (!savedHost.isEmpty()) {
+            serverHost = savedHost;
+            serverPort = configPrefs.getInt("port", 39100);
+            token = configPrefs.getString("token", token);
+            whisperOn = configPrefs.getBoolean("whisper", true);
+            uiTheme = configPrefs.getString("uiTheme", "");
+        }
+        targetUrl = buildTargetUrl();
+        baseUrl = "http://" + serverHost + ":" + serverPort;
 
         buildUi();
         hideSystemUi();
@@ -110,6 +137,7 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(false);
         s.setAllowContentAccess(false);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
+        web.addJavascriptInterface(new HostBridge(), "DshHost");
 
         WebView.setWebContentsDebuggingEnabled(true);
         web.setWebViewClient(new WebViewClient());
@@ -361,6 +389,171 @@ public class MainActivity extends Activity {
         progressBar.setVisibility(View.GONE);
         retryButton.setVisibility(View.VISIBLE);
         skipButton.setVisibility(View.VISIBLE);
+    }
+
+
+    private String buildTargetUrl() {
+        String url = "http://" + serverHost + ":" + serverPort + "/?t=" + Uri.encode(token);
+        if (!whisperOn) url += "&whisper=0";
+        if (!uiTheme.isEmpty()) url += "&uiTheme=" + Uri.encode(uiTheme);
+        return url;
+    }
+
+    private void showConfig() {
+        if (configPrefs == null) configPrefs = getSharedPreferences("config", MODE_PRIVATE);
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(4), dp(20), dp(4));
+
+        box.addView(label("服务器 IP / 主机名"));
+        EditText hostField = new EditText(this);
+        hostField.setSingleLine(true);
+        hostField.setText(serverHost);
+        hostField.setHint("例如 192.168.1.212");
+        box.addView(hostField);
+
+        box.addView(label("端口"));
+        EditText portField = new EditText(this);
+        portField.setSingleLine(true);
+        portField.setInputType(InputType.TYPE_CLASS_NUMBER);
+        portField.setText(String.valueOf(serverPort));
+        box.addView(portField);
+
+        box.addView(label("访问 token"));
+        EditText tokenField = new EditText(this);
+        tokenField.setSingleLine(true);
+        tokenField.setText(token);
+        box.addView(tokenField);
+
+        box.addView(label("主题"));
+        Spinner themeSpinner = new Spinner(this);
+        String[] themeNames = {"跟随页面", "浅色", "黑灰"};
+        ArrayAdapter<String> themeAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, themeNames);
+        themeSpinner.setAdapter(themeAdapter);
+        themeSpinner.setSelection(uiTheme.equals("light") ? 1 : uiTheme.equals("dark") ? 2 : 0);
+        box.addView(themeSpinner);
+
+        CheckBox whisperBox = new CheckBox(this);
+        whisperBox.setText("碎碎念");
+        whisperBox.setChecked(whisperOn);
+        box.addView(whisperBox);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("连接与显示")
+                .setView(box)
+                .setPositiveButton("保存并重连", null)
+                .setNegativeButton("取消", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    String host = hostField.getText().toString().trim();
+                    if (host.startsWith("http://")) host = host.substring(7);
+                    if (host.startsWith("https://")) host = host.substring(8);
+                    int slash = host.indexOf('/');
+                    if (slash >= 0) host = host.substring(0, slash);
+                    if (host.isEmpty()) {
+                        hostField.setError("不能为空");
+                        return;
+                    }
+                    int port;
+                    try {
+                        port = Integer.parseInt(portField.getText().toString().trim());
+                    } catch (NumberFormatException error) {
+                        portField.setError("端口必须是数字");
+                        return;
+                    }
+                    if (port < 1 || port > 65535) {
+                        portField.setError("端口范围 1-65535");
+                        return;
+                    }
+                    String newToken = tokenField.getText().toString().trim();
+                    if (newToken.isEmpty()) {
+                        tokenField.setError("token 不能为空");
+                        return;
+                    }
+                    serverHost = host;
+                    serverPort = port;
+                    token = newToken;
+                    whisperOn = whisperBox.isChecked();
+                    uiTheme = themeSpinner.getSelectedItemPosition() == 1 ? "light"
+                            : themeSpinner.getSelectedItemPosition() == 2 ? "dark" : "";
+                    configPrefs.edit()
+                            .putString("host", serverHost)
+                            .putInt("port", serverPort)
+                            .putString("token", token)
+                            .putBoolean("whisper", whisperOn)
+                            .putString("uiTheme", uiTheme)
+                            .apply();
+                    targetUrl = buildTargetUrl();
+                    baseUrl = "http://" + serverHost + ":" + serverPort;
+                    dialog.dismiss();
+                    restartWithConfig();
+                }));
+        dialog.show();
+    }
+
+    private TextView label(String text) {
+        TextView view = new TextView(this);
+        view.setText(text);
+        view.setTextSize(12);
+        view.setTextColor(Color.rgb(91, 111, 137));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(12);
+        view.setLayoutParams(lp);
+        return view;
+    }
+
+    private void restartWithConfig() {
+        runOnUiThread(() -> {
+            web.loadUrl("about:blank");
+            overlay.setVisibility(View.VISIBLE);
+            overlayTitle.setText("正在应用配置");
+            overlayDetail.setText("检查服务器与本地动画…");
+            progressBar.setVisibility(View.VISIBLE);
+            progressBar.setProgress(0);
+            retryButton.setVisibility(View.GONE);
+            skipButton.setVisibility(View.GONE);
+            beginSync();
+        });
+    }
+
+    private class HostBridge {
+        @JavascriptInterface
+        public int getBatteryLevel() {
+            try {
+                BatteryManager manager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+                int level = manager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+                if (level >= 0 && level <= 100) return level;
+                Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+                if (battery == null) return -1;
+                int raw = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+                int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+                return raw >= 0 && scale > 0 ? Math.round(raw * 100f / scale) : -1;
+            } catch (Exception error) {
+                return -1;
+            }
+        }
+
+        @JavascriptInterface
+        public boolean isCharging() {
+            try {
+                Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+                if (battery == null) return false;
+                int status = battery.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+                return status == BatteryManager.BATTERY_STATUS_CHARGING
+                        || status == BatteryManager.BATTERY_STATUS_FULL;
+            } catch (Exception error) {
+                return false;
+            }
+        }
+
+        @JavascriptInterface
+        public void openConfig() {
+            runOnUiThread(MainActivity.this::showConfig);
+        }
     }
 
     private void hideSystemUi() {

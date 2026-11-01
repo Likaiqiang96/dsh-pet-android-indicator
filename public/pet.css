@@ -226,7 +226,7 @@ body.split .pet.show { opacity: 1; }
 #ss-state[data-state="working"] { color: #12603f; background: #dcf5e9; border-color: #b6e6ce; }
 #ss-state[data-state="done"] { color: #1f4f8a; background: #dcecff; border-color: #b9d6fa; }
 #ss-state[data-state="error"] { color: #8a2020; background: #ffe2e2; border-color: #f5bcbc; }
-.ss-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ss-title { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
 .ss-title b { font-size: 10px; letter-spacing: .08em; color: #8193ab; font-weight: 600; }
 #ss-session { font-size: 14px; font-weight: 700; color: #17253a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #ss-live { flex: none; font-size: 11px; color: #6c7f96; display: inline-flex; align-items: center; gap: 5px; }
@@ -464,3 +464,56 @@ body.dark .ss-step.error .ico, body.dark .ss-step.error .name { color: #ff9d9d; 
 .ss-step .name { margin-right: 6px; }
 .ss-step + .ss-step { margin-top: 3px; }
 .ss-steps { gap: 0; }
+
+/* 顶栏：时间 / 设置 / 电量 */
+#topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 0;
+  pointer-events: none; color: #5b6f89;
+  font-size: 13px; font-weight: 700;
+  text-shadow: 0 1px 0 rgba(255,255,255,.6);
+}
+#clock { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+#top-actions { display: flex; align-items: center; pointer-events: auto; }
+#config-btn {
+  width: 28px; height: 28px; margin-right: 9px; padding: 0;
+  border-radius: 50%; border: 1px solid rgba(91,111,137,.28);
+  background: rgba(255,255,255,.55); color: #5b6f89;
+  font-size: 14px; line-height: 1; font-family: inherit;
+}
+#battery { display: inline-flex; align-items: center; pointer-events: none; color: #5b6f89; }
+#battery b { font-size: 11px; font-weight: 700; margin-left: 5px; font-variant-numeric: tabular-nums; }
+#battery .cell {
+  position: relative; display: inline-block; width: 20px; height: 10px;
+  border: 1px solid currentColor; border-radius: 2px; opacity: .85;
+}
+#battery .cell::after {
+  content: ""; position: absolute; right: -3px; top: 2px; width: 2px; height: 4px;
+  background: currentColor; border-radius: 0 1px 1px 0;
+}
+#battery .fill {
+  position: absolute; left: 1px; top: 1px; bottom: 1px;
+  width: calc(var(--batt, 0) * 1%); max-width: calc(100% - 2px);
+  background: currentColor; border-radius: 1px;
+}
+#battery.charging .cell { opacity: 1; }
+body.dark #topbar { color: #a9bcd4; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+body.dark #config-btn { border-color: rgba(169,188,212,.3); background: rgba(25,29,35,.65); color: #cfe0f5; }
+body.dark #battery { color: #a9bcd4; }
+body.dark #battery .fill { background: #7ee2b0; }
+
+/* hidden 属性要压过 .ss-sec / #ss-tool 的 display:flex */
+#ss-exec[hidden], #ss-tool[hidden], #ss-steps[hidden], #ss-empty[hidden], #battery[hidden] {
+  display: none !important;
+}
+
+/* 底栏跟随浅色主题 */
+body.light #metrics {
+  background: #f2f3f5;
+  color: #20344d;
+  box-shadow: 0 -1px 0 rgba(40, 70, 110, .10);
+}
+body.light #metrics label { color: #7d8fa6; }
+body.light #metrics b { color: #20344d; }
+body.light #metrics .m-sub { color: #6d8098; }

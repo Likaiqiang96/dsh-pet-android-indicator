@@ -31,7 +31,7 @@ const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
 const SESSION_ROOT = path.join(DSH_HOME, 'sessions');
 const TOKEN_FILE = path.join(ROOT, '.token');
 const URL_FILE = path.join(ROOT, 'url.txt');
-const POLL_MS = 600;
+const POLL_MS = Number(process.env.POLL_MS) || 200;
 const TAIL_BYTES = 512 * 1024;
 
 fs.mkdirSync(DATA, { recursive: true });
@@ -544,8 +544,18 @@ async function queryBalance(force = false) {
 let latest = null;
 let latestJSON = '';
 
+const SYSTEM_REFRESH_MS = Number(process.env.SYSTEM_REFRESH_MS) || 5000;
+let systemCache = { ts: 0, data: null };
+function sampleSystemCached() {
+  const now = Date.now();
+  if (!systemCache.data || now - systemCache.ts >= SYSTEM_REFRESH_MS) {
+    systemCache = { ts: now, data: sampleSystem() };
+  }
+  return systemCache.data;
+}
+
 function pollStatus() {
-  const system = sampleSystem();
+  const system = sampleSystemCached();
   const session = newestSessionFile();
   if (!session) {
     latest = { sessionId: '', title: 'DSH', state: 'idle', mood: 'idle', active: false, headline: '空闲', thinking: '', tool: null, step: 0, updatedAt: Date.now(), age: 0, rev: 0, system, inference: null };
@@ -766,7 +776,7 @@ const server = http.createServer(async (req, res) => {
         const file = findSessionFile(sessionId);
         if (!file) return json(res, { error: 'session not found' }, 404);
         const status = buildStatus(file, readEvents(file));
-        status.system = sampleSystem();
+        status.system = sampleSystemCached();
         return json(res, status);
       }
       if (!latest) pollStatus();

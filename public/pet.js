@@ -23,6 +23,16 @@
   const themeMissing = new Set();
   const DEBUG = params.get('debug') === '1';
   const token = params.get('t') || '';
+  // 临时观察模式：默认只从核心 16 段 AI 超分素材里抽；?ai=0 可恢复全量
+  const AI_ONLY = params.get('ai') !== '0';
+  const AI_CORE = new Set([
+    '待机呼吸休闲', '东张西望',
+    '工作状态-思考冒泡', '工作状态-忙碌点按', '工作状态-清点归档',
+    '工作状态-原地踱步张望', '工作状态-雀跃庆祝', '工作状态-垂头叹气冒汗',
+    '点击回应-开心跃动', '点击回应-害羞惊讶', '点击回应-傲娇生气',
+    '点击回应-挠痒咯咯笑', '点击回应-元气挥手',
+    '碎碎念-发呆碎碎念', '碎碎念-对屏碎碎念', '碎碎念-擦桌碎碎念',
+  ]);
   const ASSET_BASE = (params.get('assetBase') || '').replace(/\/+$/, '');
 
   const IDLE = '待机呼吸休闲';
@@ -63,8 +73,8 @@
   const ssSession = document.getElementById('ss-session');
   const ssThink = document.getElementById('ss-think');
   const ssTool = document.getElementById('ss-tool');
-  const ssOut = document.getElementById('ss-out');
   const ssSteps = document.getElementById('ss-steps');
+  const ssExec = document.getElementById('ss-exec');
   const ssEmpty = document.getElementById('ss-empty');
   const ssMeta = document.getElementById('ss-meta');
   const ssAge = document.getElementById('ss-age');
@@ -79,6 +89,11 @@
   const whisperText = document.getElementById('whisper-text');
   const ssSwitch = document.getElementById('ss-switch');
   const themeToggle = document.getElementById('theme-toggle');
+  const topClock = document.getElementById('clock');
+  const topBattery = document.getElementById('battery');
+  const batteryFill = topBattery ? topBattery.querySelector('.fill') : null;
+  const batteryText = topBattery ? topBattery.querySelector('b') : null;
+  const configButton = document.getElementById('config-btn');
   const sessionSheet = document.getElementById('session-sheet');
   const sheetList = document.getElementById('sheet-list');
   const preloads = [];
@@ -118,6 +133,8 @@
   }
 
   let theme = localStorage.getItem('dsh-pet.theme') === 'dark' ? 'dark' : 'light';
+  const uiTheme = params.get('uiTheme');
+  if (uiTheme === 'light' || uiTheme === 'dark') theme = uiTheme;
 
   function assetUrl(name) {
     if (LIGHT) {
@@ -217,17 +234,20 @@
 
   function buildRandomPool() {
     const excluded = new Set([...(manifest.workStatus || []), IDLE, ...(manifest.whisper || [])]);
-    const pool = (manifest.all && manifest.all.length ? manifest.all : []).filter(name => !excluded.has(name));
+    const pool = (manifest.all && manifest.all.length ? manifest.all : []).filter(name => !excluded.has(name) && (!AI_ONLY || AI_CORE.has(name)));
     if (pool.length) randomPool = pool;
   }
 
   function rollAction() {
     const roll = Math.random() * 100;
     if (roll < 10) return null; // 继续待机
-    if (roll < 15) return pick(manifest.turn);
-    if (roll < 20) return pick(['原地漂浮踏步', '原地左转奔跑']);
-    const pools = manifest.categories.map(category => ({ weight: category.weight, actions: category.actions }));
-    if (manifest.whisper.length) pools.push({ weight: 6, actions: manifest.whisper });
+    if (!AI_ONLY && roll < 15) return pick(manifest.turn);
+    if (!AI_ONLY && roll < 20) return pick(['原地漂浮踏步', '原地左转奔跑']);
+    let categories = manifest.categories;
+    if (AI_ONLY) categories = categories.map(category => ({ weight: category.weight, actions: category.actions.filter(name => AI_CORE.has(name)) })).filter(category => category.actions.length);
+    const pools = categories.map(category => ({ weight: category.weight, actions: category.actions }));
+    const whisper = manifest.whisper.filter(name => !AI_ONLY || AI_CORE.has(name));
+    if (whisper.length) pools.push({ weight: 6, actions: whisper });
     const total = pools.reduce((sum, pool) => sum + pool.weight, 0);
     let point = Math.random() * total;
     for (const pool of pools) {
@@ -341,6 +361,21 @@
       if (nearBottom || muted) ssThink.scrollTop = ssThink.scrollHeight;
     }
 
+    const taskActive = !!s.active && stateName !== 'idle' && stateName !== 'done' && stateName !== 'error';
+    if (!taskActive) {
+      ssExec.hidden = true;
+      ssSteps.hidden = true;
+      ssSteps.textContent = '';
+      lastStepsSig = '';
+      ssTool.hidden = true;
+      ssEmpty.hidden = true;
+      ssMeta.textContent = s.step ? `第 ${s.step} 步 · 已结束` : '已结束';
+      ssAge.textContent = '';
+      ssLive.classList.remove('offline');
+      return;
+    }
+    ssExec.hidden = false;
+
     const steps = Array.isArray(s.steps) ? s.steps : [];
     const stepsSig = steps.map(item => `${item.id}:${item.status}:${item.detail}`).join('|');
     if (stepsSig !== lastStepsSig) {
@@ -366,21 +401,9 @@
       ssTool.hidden = false;
       ssTool.querySelector('.name').textContent = tool.label + (tool.running ? ' · 进行中' : ' · 已完成');
       ssTool.querySelector('code').textContent = tool.detail || tool.name;
-      if (tool.output) {
-        ssOut.hidden = false;
-        const output = tool.output.length > 1200 ? '…' + tool.output.slice(-1200) : tool.output;
-        if (ssOut.textContent !== output) {
-          ssOut.textContent = output;
-          ssOut.scrollTop = ssOut.scrollHeight;
-        }
-        ssOut.style.color = tool.isError ? '#a33' : '';
-      } else {
-        ssOut.hidden = true;
-      }
       ssEmpty.hidden = true;
     } else {
       ssTool.hidden = true;
-      ssOut.hidden = true;
       ssEmpty.hidden = false;
       ssEmpty.textContent = s.finalText ? '回复已生成' : '暂无工具调用';
     }
@@ -693,7 +716,7 @@
   function startPolling() {
     if (pollTimer) return;
     fetchStatus();
-    pollTimer = window.setInterval(fetchStatus, 650);
+    pollTimer = window.setInterval(fetchStatus, 150);
   }
 
   async function loadBalance(force = false) {
@@ -774,6 +797,55 @@
   document.getElementById('ss-session').addEventListener('click', openSheet);
   document.getElementById('sheet-close').addEventListener('click', () => { sessionSheet.hidden = true; });
   sessionSheet.addEventListener('click', event => { if (event.target === sessionSheet) sessionSheet.hidden = true; });
+
+
+  function updateClock() {
+    if (!topClock) return;
+    const now = new Date();
+    topClock.textContent = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  }
+
+  function setBattery(level, charging) {
+    if (!topBattery || !batteryText) return;
+    if (!Number.isFinite(level) || level < 0) { topBattery.hidden = true; return; }
+    topBattery.hidden = false;
+    topBattery.classList.toggle('charging', !!charging);
+    topBattery.style.setProperty('--batt', String(Math.max(0, Math.min(100, level))));
+    batteryText.textContent = Math.round(level) + '%' + (charging ? ' ⚡' : '');
+  }
+
+  function updateBattery() {
+    let handled = false;
+    try {
+      if (window.DshHost && typeof window.DshHost.getBatteryLevel === 'function') {
+        const level = Number(window.DshHost.getBatteryLevel());
+        const charging = typeof window.DshHost.isCharging === 'function' && window.DshHost.isCharging();
+        if (level >= 0) { setBattery(level, charging); handled = true; }
+      }
+    } catch { /* ignore */ }
+    if (handled) return;
+    if (navigator.getBattery) {
+      navigator.getBattery().then(battery => {
+        setBattery(battery.level * 100, battery.charging);
+        battery.addEventListener('levelchange', () => setBattery(battery.level * 100, battery.charging));
+        battery.addEventListener('chargingchange', () => setBattery(battery.level * 100, battery.charging));
+      }).catch(() => { if (topBattery) topBattery.hidden = true; });
+    } else if (topBattery) {
+      topBattery.hidden = true;
+    }
+  }
+
+  if (configButton) {
+    configButton.addEventListener('click', () => {
+      try {
+        if (window.DshHost && typeof window.DshHost.openConfig === 'function') window.DshHost.openConfig();
+      } catch { /* ignore */ }
+    });
+  }
+  updateClock();
+  updateBattery();
+  window.setInterval(updateClock, 1000);
+  window.setInterval(updateBattery, 30000);
 
   if (!PLAYLIST) {
     startPolling();

@@ -42,3 +42,14 @@ qr.png
 # 大文件工具包（超分用，不入库）
 tools/realesrgan-*.zip
 tools/*.zip
+
+# AI 超分中间备份 / 本轮临时预览
+assets-light-1080-core/
+assets-dark-1080-core/
+preview-ai-compare.png
+preview-config.png
+preview-final-ui.png
+preview-header.png
+preview-idle-clear.png
+preview-metrics-theme.png
+preview-no-output.png
