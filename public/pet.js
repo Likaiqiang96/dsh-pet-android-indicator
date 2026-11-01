@@ -23,16 +23,6 @@
   const themeMissing = new Set();
   const DEBUG = params.get('debug') === '1';
   const token = params.get('t') || '';
-  // 临时观察模式：默认只从核心 16 段 AI 超分素材里抽；?ai=0 可恢复全量
-  const AI_ONLY = params.get('ai') !== '0';
-  const AI_CORE = new Set([
-    '待机呼吸休闲', '东张西望',
-    '工作状态-思考冒泡', '工作状态-忙碌点按', '工作状态-清点归档',
-    '工作状态-原地踱步张望', '工作状态-雀跃庆祝', '工作状态-垂头叹气冒汗',
-    '点击回应-开心跃动', '点击回应-害羞惊讶', '点击回应-傲娇生气',
-    '点击回应-挠痒咯咯笑', '点击回应-元气挥手',
-    '碎碎念-发呆碎碎念', '碎碎念-对屏碎碎念', '碎碎念-擦桌碎碎念',
-  ]);
   const ASSET_BASE = (params.get('assetBase') || '').replace(/\/+$/, '');
 
   const IDLE = '待机呼吸休闲';
@@ -234,19 +224,17 @@
 
   function buildRandomPool() {
     const excluded = new Set([...(manifest.workStatus || []), IDLE, ...(manifest.whisper || [])]);
-    const pool = (manifest.all && manifest.all.length ? manifest.all : []).filter(name => !excluded.has(name) && (!AI_ONLY || AI_CORE.has(name)));
+    const pool = (manifest.all && manifest.all.length ? manifest.all : []).filter(name => !excluded.has(name));
     if (pool.length) randomPool = pool;
   }
 
   function rollAction() {
     const roll = Math.random() * 100;
     if (roll < 10) return null; // 继续待机
-    if (!AI_ONLY && roll < 15) return pick(manifest.turn);
-    if (!AI_ONLY && roll < 20) return pick(['原地漂浮踏步', '原地左转奔跑']);
-    let categories = manifest.categories;
-    if (AI_ONLY) categories = categories.map(category => ({ weight: category.weight, actions: category.actions.filter(name => AI_CORE.has(name)) })).filter(category => category.actions.length);
-    const pools = categories.map(category => ({ weight: category.weight, actions: category.actions }));
-    const whisper = manifest.whisper.filter(name => !AI_ONLY || AI_CORE.has(name));
+    if (roll < 15) return pick(manifest.turn);
+    if (roll < 20) return pick(['原地漂浮踏步', '原地左转奔跑']);
+    const pools = manifest.categories.map(category => ({ weight: category.weight, actions: category.actions }));
+    const whisper = manifest.whisper;
     if (whisper.length) pools.push({ weight: 6, actions: whisper });
     const total = pools.reduce((sum, pool) => sum + pool.weight, 0);
     let point = Math.random() * total;
