@@ -1,0 +1,15 @@
+[Unit]
+Description=DSH 鲸鱼娘全屏页（手机）
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/kaiqiang/share/data/workspace/dsh-pet-screen
+ExecStart=/home/kaiqiang/.nvm/versions/node/v24.21.0/bin/node /home/kaiqiang/share/data/workspace/dsh-pet-screen/server.mjs
+Environment=PORT=39100
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

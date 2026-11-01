@@ -1,0 +1,44 @@
+# 本地密钥 / token / 运行数据
+.token
+url.txt
+.pid
+data/
+*.log
+run.log
+
+# 生成后的视频（体积大；用 tools/ 从 assets/ 生成）
+assets-light/
+assets-dark/
+assets-light-720/
+assets-dark-720/
+assets-hd/
+
+# Android 构建产物与签名
+android/build/
+android/dist/
+android/keystore/
+
+# 本地截图 / 旧预览
+shot_*.png
+preview-icon.png
+preview-phone.png
+preview-whisper.png
+preview-whisper2.png
+preview-heart.png
+preview-balance.png
+preview-connected.png
+preview-logs.png
+preview-m.png
+preview-split.png
+preview-steps2.png
+preview-steps3.png
+preview.png
+qr.png
+
+# 编辑器
+.DS_Store
+*.swp
+
+# 大文件工具包（超分用，不入库）
+tools/realesrgan-*.zip
+tools/*.zip
