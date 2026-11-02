@@ -1,12 +1,14 @@
 package com.dsh.petscreen;
 
 import android.app.Activity;
-import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.BatteryManager;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
@@ -14,6 +16,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
 import android.text.InputType;
+import android.view.Window;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -27,7 +30,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import android.widget.Spinner;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -402,108 +405,247 @@ public class MainActivity extends Activity {
     private void showConfig() {
         if (configPrefs == null) configPrefs = getSharedPreferences("config", MODE_PRIVATE);
 
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(20), dp(4), dp(20), dp(4));
+        final Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setCanceledOnTouchOutside(true);
 
-        box.addView(label("服务器 IP / 主机名"));
-        EditText hostField = new EditText(this);
-        hostField.setSingleLine(true);
-        hostField.setText(serverHost);
-        hostField.setHint("例如 192.168.1.212");
-        box.addView(hostField);
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
 
-        box.addView(label("端口"));
-        EditText portField = new EditText(this);
-        portField.setSingleLine(true);
-        portField.setInputType(InputType.TYPE_CLASS_NUMBER);
-        portField.setText(String.valueOf(serverPort));
-        box.addView(portField);
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(22), dp(18), dp(22), dp(16));
+        card.setBackground(round(Color.rgb(247, 249, 252), 22, 0));
 
-        box.addView(label("访问 token"));
-        EditText tokenField = new EditText(this);
-        tokenField.setSingleLine(true);
-        tokenField.setText(token);
-        box.addView(tokenField);
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = new TextView(this);
+        title.setText("连接设置");
+        title.setTextSize(20);
+        title.setTextColor(Color.rgb(25, 38, 56));
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        header.addView(title, titleLp);
+        TextView close = new TextView(this);
+        close.setText("×");
+        close.setTextSize(24);
+        close.setTextColor(Color.rgb(120, 137, 158));
+        close.setGravity(Gravity.CENTER);
+        close.setPadding(dp(10), 0, dp(4), dp(4));
+        close.setOnClickListener(v -> dialog.dismiss());
+        header.addView(close);
+        card.addView(header);
 
-        box.addView(label("主题"));
-        Spinner themeSpinner = new Spinner(this);
-        String[] themeNames = {"跟随页面", "浅色", "黑灰"};
-        ArrayAdapter<String> themeAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, themeNames);
-        themeSpinner.setAdapter(themeAdapter);
-        themeSpinner.setSelection(uiTheme.equals("light") ? 1 : uiTheme.equals("dark") ? 2 : 0);
-        box.addView(themeSpinner);
+        TextView subtitle = new TextView(this);
+        subtitle.setText("服务器与显示方式");
+        subtitle.setTextSize(12);
+        subtitle.setTextColor(Color.rgb(112, 128, 148));
+        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        subLp.topMargin = dp(2);
+        card.addView(subtitle, subLp);
 
-        CheckBox whisperBox = new CheckBox(this);
-        whisperBox.setText("碎碎念");
-        whisperBox.setChecked(whisperOn);
-        box.addView(whisperBox);
+        card.addView(label("服务器 IP / 主机名"));
+        EditText hostField = field(serverHost, "例如 192.168.1.212", InputType.TYPE_CLASS_TEXT);
+        card.addView(hostField);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("连接与显示")
-                .setView(box)
-                .setPositiveButton("保存并重连", null)
-                .setNegativeButton("取消", null)
-                .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(v -> {
-                    String host = hostField.getText().toString().trim();
-                    if (host.startsWith("http://")) host = host.substring(7);
-                    if (host.startsWith("https://")) host = host.substring(8);
-                    int slash = host.indexOf('/');
-                    if (slash >= 0) host = host.substring(0, slash);
-                    if (host.isEmpty()) {
-                        hostField.setError("不能为空");
-                        return;
-                    }
-                    int port;
-                    try {
-                        port = Integer.parseInt(portField.getText().toString().trim());
-                    } catch (NumberFormatException error) {
-                        portField.setError("端口必须是数字");
-                        return;
-                    }
-                    if (port < 1 || port > 65535) {
-                        portField.setError("端口范围 1-65535");
-                        return;
-                    }
-                    String newToken = tokenField.getText().toString().trim();
-                    if (newToken.isEmpty()) {
-                        tokenField.setError("token 不能为空");
-                        return;
-                    }
-                    serverHost = host;
-                    serverPort = port;
-                    token = newToken;
-                    whisperOn = whisperBox.isChecked();
-                    uiTheme = themeSpinner.getSelectedItemPosition() == 1 ? "light"
-                            : themeSpinner.getSelectedItemPosition() == 2 ? "dark" : "";
-                    configPrefs.edit()
-                            .putString("host", serverHost)
-                            .putInt("port", serverPort)
-                            .putString("token", token)
-                            .putBoolean("whisper", whisperOn)
-                            .putString("uiTheme", uiTheme)
-                            .apply();
-                    targetUrl = buildTargetUrl();
-                    baseUrl = "http://" + serverHost + ":" + serverPort;
-                    dialog.dismiss();
-                    restartWithConfig();
-                }));
+        LinearLayout portRow = new LinearLayout(this);
+        portRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout portWrap = new LinearLayout(this);
+        portWrap.setOrientation(LinearLayout.VERTICAL);
+        portWrap.addView(label("端口"));
+        EditText portField = field(String.valueOf(serverPort), "39100", InputType.TYPE_CLASS_NUMBER);
+        portWrap.addView(portField);
+        portRow.addView(portWrap, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        LinearLayout tokenWrap = new LinearLayout(this);
+        tokenWrap.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams tokenWrapLp = new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 2f);
+        tokenWrapLp.leftMargin = dp(10);
+        tokenWrap.addView(label("访问 token"));
+        EditText tokenField = field(token, "启动时打印的 token", InputType.TYPE_CLASS_TEXT);
+        tokenWrap.addView(tokenField);
+        portRow.addView(tokenWrap, tokenWrapLp);
+        card.addView(portRow);
+
+        card.addView(label("主题"));
+        final String[] selectedTheme = {uiTheme};
+        final String[] themeValues = {"", "light", "dark"};
+        final String[] themeNames = {"跟随页面", "浅色", "黑灰"};
+        LinearLayout segment = new LinearLayout(this);
+        segment.setOrientation(LinearLayout.HORIZONTAL);
+        segment.setBackground(round(Color.rgb(234, 240, 248), 12, 0));
+        segment.setPadding(dp(3), dp(3), dp(3), dp(3));
+        final TextView[] options = new TextView[themeNames.length];
+        for (int i = 0; i < themeNames.length; i++) {
+            final int index = i;
+            TextView option = new TextView(this);
+            option.setText(themeNames[i]);
+            option.setTextSize(13);
+            option.setGravity(Gravity.CENTER);
+            option.setPadding(0, dp(8), 0, dp(8));
+            option.setOnClickListener(v -> {
+                selectedTheme[0] = themeValues[index];
+                for (int j = 0; j < options.length; j++) {
+                    styleSegment(options[j], j == index);
+                }
+            });
+            options[i] = option;
+            segment.addView(option, new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        styleSegment(options[Math.max(0, java.util.Arrays.asList(themeValues).indexOf(uiTheme))], true);
+        card.addView(segment);
+
+        LinearLayout whisperRow = new LinearLayout(this);
+        whisperRow.setOrientation(LinearLayout.HORIZONTAL);
+        whisperRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams whisperRowLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        whisperRowLp.topMargin = dp(14);
+        TextView whisperTitle = new TextView(this);
+        whisperTitle.setText("碎碎念");
+        whisperTitle.setTextSize(14);
+        whisperTitle.setTextColor(Color.rgb(35, 50, 70));
+        whisperRow.addView(whisperTitle, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        final boolean[] whisperState = {whisperOn};
+        final TextView whisperToggle = new TextView(this);
+        whisperToggle.setTextSize(12);
+        whisperToggle.setTypeface(null, android.graphics.Typeface.BOLD);
+        whisperToggle.setGravity(Gravity.CENTER);
+        whisperToggle.setPadding(dp(12), dp(6), dp(12), dp(6));
+        styleToggle(whisperToggle, whisperState[0]);
+        whisperToggle.setOnClickListener(v -> {
+            whisperState[0] = !whisperState[0];
+            styleToggle(whisperToggle, whisperState[0]);
+        });
+        whisperRow.addView(whisperToggle);
+        card.addView(whisperRow, whisperRowLp);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        actionsLp.topMargin = dp(18);
+        TextView cancel = new TextView(this);
+        cancel.setText("取消");
+        cancel.setTextSize(14);
+        cancel.setTextColor(Color.rgb(112, 128, 148));
+        cancel.setPadding(dp(14), dp(10), dp(14), dp(10));
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        actions.addView(cancel);
+        TextView save = new TextView(this);
+        save.setText("保存并重连");
+        save.setTextSize(14);
+        save.setTextColor(Color.WHITE);
+        save.setTypeface(null, android.graphics.Typeface.BOLD);
+        save.setGravity(Gravity.CENTER);
+        save.setPadding(dp(18), dp(10), dp(18), dp(10));
+        save.setBackground(round(Color.rgb(47, 107, 255), 12, 0));
+        save.setOnClickListener(v -> {
+            String host = hostField.getText().toString().trim();
+            if (host.startsWith("http://")) host = host.substring(7);
+            if (host.startsWith("https://")) host = host.substring(8);
+            int slash = host.indexOf('/');
+            if (slash >= 0) host = host.substring(0, slash);
+            if (host.isEmpty()) { hostField.setError("不能为空"); return; }
+            int port;
+            try {
+                port = Integer.parseInt(portField.getText().toString().trim());
+            } catch (NumberFormatException error) {
+                portField.setError("端口必须是数字");
+                return;
+            }
+            if (port < 1 || port > 65535) { portField.setError("端口范围 1-65535"); return; }
+            String newToken = tokenField.getText().toString().trim();
+            if (newToken.isEmpty()) { tokenField.setError("token 不能为空"); return; }
+            serverHost = host;
+            serverPort = port;
+            token = newToken;
+            whisperOn = whisperState[0];
+            uiTheme = selectedTheme[0];
+            configPrefs.edit()
+                    .putString("host", serverHost)
+                    .putInt("port", serverPort)
+                    .putString("token", token)
+                    .putBoolean("whisper", whisperOn)
+                    .putString("uiTheme", uiTheme)
+                    .apply();
+            targetUrl = buildTargetUrl();
+            baseUrl = "http://" + serverHost + ":" + serverPort;
+            dialog.dismiss();
+            restartWithConfig();
+        });
+        actions.addView(save);
+        card.addView(actions, actionsLp);
+
+        scroll.addView(card);
+        dialog.setContentView(scroll);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams lp = window.getAttributes();
+            lp.width = Math.round(getResources().getDisplayMetrics().widthPixels * 0.9f);
+            lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            lp.dimAmount = 0.45f;
+            window.setAttributes(lp);
+        }
         dialog.show();
     }
 
     private TextView label(String text) {
         TextView view = new TextView(this);
         view.setText(text);
-        view.setTextSize(12);
-        view.setTextColor(Color.rgb(91, 111, 137));
+        view.setTextSize(11);
+        view.setTextColor(Color.rgb(112, 128, 148));
+        view.setTypeface(null, android.graphics.Typeface.BOLD);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = dp(12);
+        lp.topMargin = dp(14);
+        lp.bottomMargin = dp(5);
         view.setLayoutParams(lp);
         return view;
+    }
+
+    private EditText field(String value, String hint, int inputType) {
+        EditText view = new EditText(this);
+        view.setText(value);
+        view.setHint(hint);
+        view.setSingleLine(true);
+        view.setInputType(inputType);
+        view.setTextSize(15);
+        view.setTextColor(Color.rgb(25, 38, 56));
+        view.setHintTextColor(Color.rgb(154, 170, 191));
+        view.setPadding(dp(12), dp(10), dp(12), dp(10));
+        view.setBackground(round(Color.WHITE, 12, Color.rgb(220, 228, 239)));
+        return view;
+    }
+
+    private GradientDrawable round(int color, int radiusDp, int strokeColor) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp(radiusDp));
+        if (strokeColor != 0) drawable.setStroke(dp(1), strokeColor);
+        return drawable;
+    }
+
+    private void styleToggle(TextView view, boolean on) {
+        view.setText(on ? "开启" : "关闭");
+        view.setTextColor(on ? Color.rgb(47, 107, 255) : Color.rgb(112, 128, 148));
+        view.setBackground(round(on ? Color.rgb(232, 240, 255) : Color.rgb(234, 240, 248), 999, 0));
+    }
+
+    private void styleSegment(TextView view, boolean selected) {
+        view.setTextColor(selected ? Color.rgb(47, 107, 255) : Color.rgb(91, 111, 137));
+        view.setTypeface(null, selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+        view.setBackground(selected ? round(Color.WHITE, 9, 0) : null);
     }
 
     private void restartWithConfig() {
