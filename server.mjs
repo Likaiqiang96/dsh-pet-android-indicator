@@ -806,6 +806,25 @@ const server = http.createServer(async (req, res) => {
       }
       return json(res, { ok: true, version: hash.digest('hex').slice(0, 16), totalBytes, count: files.length, files });
     }
+    if (pathname === '/api/anim-coverage') {
+      const manifestPath = path.join(ROOT, 'public', 'animations.json');
+      let names = [];
+      try { names = JSON.parse(fs.readFileSync(manifestPath, 'utf8')).all || []; } catch { /* ignore */ }
+      const seen = new Set();
+      for (const key of animCounts.keys()) {
+        const index = key.indexOf(' | ');
+        if (index >= 0) seen.add(key.slice(index + 3));
+      }
+      try {
+        for (const line of fs.readFileSync(animLogPath, 'utf8').split('\n')) {
+          if (!line.trim()) continue;
+          const entry = JSON.parse(line);
+          if (entry && typeof entry.name === 'string') seen.add(entry.name);
+        }
+      } catch { /* 日志还没生成 */ }
+      const missing = names.filter(name => !seen.has(name));
+      return json(res, { ok: true, total: names.length, seen: seen.size, missing });
+    }
     if (pathname === '/api/anim-log' && req.method === 'POST') {
       try {
         const body = JSON.parse((await readBody(req, 8192)).toString('utf8') || '{}');

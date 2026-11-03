@@ -102,6 +102,7 @@
   let whisperHide = 0;
   let lastStepsSig = '';
   let randomPool = [];
+  let randomBag = [];
   const animHistory = [];
   let lastStateAnim = '';
   let stateRotationTimer = 0;
@@ -224,25 +225,31 @@
 
   function buildRandomPool() {
     const excluded = new Set([...(manifest.workStatus || []), IDLE, ...(manifest.whisper || [])]);
-    const pool = (manifest.all && manifest.all.length ? manifest.all : []).filter(name => !excluded.has(name));
-    if (pool.length) randomPool = pool;
+    const coverageExtra = new Set(['工作状态-原地踱步张望']);
+    const pool = (manifest.all && manifest.all.length ? manifest.all : []).filter(name => !excluded.has(name) || coverageExtra.has(name));
+    if (pool.length) {
+      randomPool = pool;
+      randomBag = [];
+    }
+  }
+
+  function nextRandomName() {
+    if (!randomPool.length) return null;
+    if (!randomBag.length) {
+      randomBag = randomPool.slice();
+      for (let i = randomBag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = randomBag[i];
+        randomBag[i] = randomBag[j];
+        randomBag[j] = tmp;
+      }
+    }
+    return randomBag.pop();
   }
 
   function rollAction() {
-    const roll = Math.random() * 100;
-    if (roll < 10) return null; // 继续待机
-    if (roll < 15) return pick(manifest.turn);
-    if (roll < 20) return pick(['原地漂浮踏步', '原地左转奔跑']);
-    const pools = manifest.categories.map(category => ({ weight: category.weight, actions: category.actions }));
-    const whisper = manifest.whisper;
-    if (whisper.length) pools.push({ weight: 6, actions: whisper });
-    const total = pools.reduce((sum, pool) => sum + pool.weight, 0);
-    let point = Math.random() * total;
-    for (const pool of pools) {
-      point -= pool.weight;
-      if (point <= 0) return pick(pool.actions);
-    }
-    return pick(FALLBACK.categories[0].actions);
+    if (Math.random() < 0.1) return null; // 继续待机
+    return nextRandomName();
   }
 
   function stateAnimationName() {
@@ -288,7 +295,7 @@
         return;
       }
       if (Math.random() < 0.8) {
-        const action = pick(randomPool.length ? randomPool : FALLBACK.categories[0].actions);
+        const action = nextRandomName();
         if (action) play(action, { once: true, reason: 'interlude', after: resumeState });
       }
       scheduleIdleAction();
