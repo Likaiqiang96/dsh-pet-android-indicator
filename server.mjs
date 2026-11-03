@@ -24,6 +24,7 @@ const ASSETS = path.join(ROOT, 'assets');
 const ASSETS_HD = path.join(ROOT, 'assets-hd');
 const ASSETS_LIGHT = path.join(ROOT, 'assets-light');
 const ASSETS_DARK = path.join(ROOT, 'assets-dark');
+const ASSETS_AMOLED = path.join(ROOT, 'assets-amoled');
 const DATA = path.join(ROOT, 'data');
 const PORT = Number(process.env.PORT || 39100);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -723,6 +724,14 @@ async function serveDark(req, res, pathname) {
   return serveFile(req, res, file, type, { 'access-control-allow-origin': '*' });
 }
 
+async function serveAmoled(req, res, pathname) {
+  const relative = pathname.slice('/amoled/'.length);
+  const file = path.resolve(ASSETS_AMOLED, relative);
+  if (file !== ASSETS_AMOLED && !file.startsWith(ASSETS_AMOLED + path.sep)) { res.writeHead(404).end(); return; }
+  const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
+  return serveFile(req, res, file, type, { 'access-control-allow-origin': '*' });
+}
+
 async function serveAsset(req, res, pathname) {
   const relative = pathname.slice('/assets/'.length);
   const hd = path.resolve(ASSETS_HD, relative);
@@ -748,7 +757,7 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('set-cookie', `dsh_screen=${TOKEN}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`);
   }
 
-  const publicAsset = pathname.startsWith('/assets/') || pathname.startsWith('/light/') || pathname.startsWith('/dark/');
+  const publicAsset = pathname.startsWith('/assets/') || pathname.startsWith('/light/') || pathname.startsWith('/dark/') || pathname.startsWith('/amoled/');
   const publicStatic = pathname === '/animations.json';
   if (!publicAsset && !publicStatic && !authorized(req, url)) {
     res.writeHead(401, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
@@ -792,7 +801,7 @@ const server = http.createServer(async (req, res) => {
       const files = [];
       let totalBytes = 0;
       const hash = crypto.createHash('sha1');
-      for (const [theme, dir] of [['light', ASSETS_LIGHT], ['dark', ASSETS_DARK]]) {
+      for (const [theme, dir] of [['light', ASSETS_LIGHT], ['dark', ASSETS_DARK], ['amoled', ASSETS_AMOLED]]) {
         let names = [];
         try { names = fs.readdirSync(dir).filter(f => f.endsWith('.mp4')).sort(); } catch { continue; }
         for (const file of names) {
@@ -857,6 +866,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname.startsWith('/light/')) return await serveLight(req, res, pathname);
     if (pathname.startsWith('/dark/')) return await serveDark(req, res, pathname);
+    if (pathname.startsWith('/amoled/')) return await serveAmoled(req, res, pathname);
     if (publicAsset) return await serveAsset(req, res, pathname);
     return await serveStatic(req, res, pathname);
   } catch (error) {

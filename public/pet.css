@@ -517,3 +517,38 @@ body.light #metrics {
 body.light #metrics label { color: #7d8fa6; }
 body.light #metrics b { color: #20344d; }
 body.light #metrics .m-sub { color: #6d8098; }
+
+/* AMOLED 纯黑：页面与视频底都压到 #000 */
+body.amoled { background: #000; }
+body.amoled #bg, body.amoled #stage { background: #000; }
+body.amoled #split-status {
+  background: #000;
+  border-top-color: rgba(255, 255, 255, .07);
+}
+body.amoled #metrics {
+  background: #000;
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, .07);
+}
+body.amoled #whisper {
+  background: #0a0a0a;
+  border-color: #252525;
+  color: #f2f6ff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .8);
+}
+body.amoled #whisper::after {
+  background: #0a0a0a;
+  border-color: #252525;
+}
+body.amoled #session-sheet {
+  background: #050505;
+  border-color: #252525;
+  color: #eef4ff;
+}
+body.amoled #session-sheet header { border-color: #252525; }
+body.amoled .sheet-item { border-color: #1d1d1d; }
+body.amoled #theme-toggle {
+  background: #0a0a0a;
+  border-color: #2a2a2a;
+  color: #e8eef8;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .8);
+}

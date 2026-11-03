@@ -527,6 +527,32 @@ public class MainActivity extends Activity {
         whisperRow.addView(whisperToggle);
         card.addView(whisperRow, whisperRowLp);
 
+        final boolean[] amoledState = {"amoled".equals(uiTheme)};
+        LinearLayout amoledRow = new LinearLayout(this);
+        amoledRow.setOrientation(LinearLayout.HORIZONTAL);
+        amoledRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams amoledRowLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        amoledRowLp.topMargin = dp(10);
+        TextView amoledTitle = new TextView(this);
+        amoledTitle.setText("AMOLED 纯黑");
+        amoledTitle.setTextSize(14);
+        amoledTitle.setTextColor(Color.rgb(35, 50, 70));
+        amoledRow.addView(amoledTitle, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        final TextView amoledToggle = new TextView(this);
+        amoledToggle.setTextSize(12);
+        amoledToggle.setTypeface(null, android.graphics.Typeface.BOLD);
+        amoledToggle.setGravity(Gravity.CENTER);
+        amoledToggle.setPadding(dp(12), dp(6), dp(12), dp(6));
+        styleToggle(amoledToggle, amoledState[0]);
+        amoledToggle.setOnClickListener(v -> {
+            amoledState[0] = !amoledState[0];
+            styleToggle(amoledToggle, amoledState[0]);
+        });
+        amoledRow.addView(amoledToggle);
+        card.addView(amoledRow, amoledRowLp);
+
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
@@ -569,7 +595,7 @@ public class MainActivity extends Activity {
             serverPort = port;
             token = newToken;
             whisperOn = whisperState[0];
-            uiTheme = selectedTheme[0];
+            uiTheme = amoledState[0] ? "amoled" : selectedTheme[0];
             configPrefs.edit()
                     .putString("host", serverHost)
                     .putInt("port", serverPort)
@@ -798,7 +824,7 @@ public class MainActivity extends Activity {
                     sendError(s, 400, "Bad Request");
                     return;
                 }
-                if (!decoded.startsWith("/light/") && !decoded.startsWith("/dark/")) {
+                if (!decoded.startsWith("/light/") && !decoded.startsWith("/dark/") && !decoded.startsWith("/amoled/")) {
                     sendError(s, 404, "Not Found");
                     return;
                 }

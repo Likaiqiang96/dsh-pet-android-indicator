@@ -99,6 +99,12 @@ adb install -r dist/WhaleScreen-1.0.apk
 | `.token` | 首次启动自动生成；删除后重启换 token |
 | 系统服务 | `dsh-pet-screen.service` 是 systemd 模板，按实际路径/用户修改 |
 
+## 主题与 AMOLED 纯黑
+
+- 右下角按钮按 **浅色 → 黑灰 → AMOLED 纯黑** 循环。
+- 设置里的「AMOLED 纯黑」开关开启后，页面背景、状态卡、底栏、会话面板、碎碎念全部压到 `#000`，视频用单独的 `assets-amoled/`（1280×720，full-range H.264），避免普通 limited-range 视频在纯黑屏上显示成深灰。
+- 三个主题的素材：`assets-light`、`assets-dark`、`assets-amoled`；App 首次同步会一起下载。
+
 ## 界面与配置
 
 - 顶栏左上角显示本机时间，右上角显示电池百分比（充电时带 ⚡）。

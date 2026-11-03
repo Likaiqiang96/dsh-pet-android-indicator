@@ -113,7 +113,7 @@
     video.addEventListener('error', () => {
       const name = video.dataset.name;
       const current = video.currentSrc || '';
-      const used = current.indexOf('/dark/') >= 0 ? 'dark' : current.indexOf('/light/') >= 0 ? 'light' : '';
+      const used = current.indexOf('/amoled/') >= 0 ? 'amoled' : current.indexOf('/dark/') >= 0 ? 'dark' : current.indexOf('/light/') >= 0 ? 'light' : '';
       if (LIGHT && name && used) {
         themeMissing.add(used + ':' + name);
         play(name, { force: true, reason: 'fallback' });
@@ -123,17 +123,23 @@
     });
   }
 
-  let theme = localStorage.getItem('dsh-pet.theme') === 'dark' ? 'dark' : 'light';
+  const storedTheme = localStorage.getItem('dsh-pet.theme');
+  let theme = storedTheme === 'dark' || storedTheme === 'amoled' ? storedTheme : 'light';
   const uiTheme = params.get('uiTheme');
-  if (uiTheme === 'light' || uiTheme === 'dark') theme = uiTheme;
+  if (uiTheme === 'light' || uiTheme === 'dark' || uiTheme === 'amoled') theme = uiTheme;
+
+  function themeDir(value) {
+    return value === 'dark' ? '/dark/' : value === 'amoled' ? '/amoled/' : '/light/';
+  }
 
   function assetUrl(name) {
     if (LIGHT) {
-      const primary = ASSET_BASE + (theme === 'dark' ? '/dark/' : '/light/');
-      if (!themeMissing.has(theme + ':' + name)) return primary + encodeURIComponent(name) + '.mp4';
-      const other = theme === 'dark' ? 'light' : 'dark';
-      if (!themeMissing.has(other + ':' + name)) {
-        return ASSET_BASE + (other === 'dark' ? '/dark/' : '/light/') + encodeURIComponent(name) + '.mp4';
+      if (!themeMissing.has(theme + ':' + name)) {
+        return ASSET_BASE + themeDir(theme) + encodeURIComponent(name) + '.mp4';
+      }
+      const fallback = theme === 'amoled' ? 'dark' : theme === 'dark' ? 'light' : 'dark';
+      if (!themeMissing.has(fallback + ':' + name)) {
+        return ASSET_BASE + themeDir(fallback) + encodeURIComponent(name) + '.mp4';
       }
     }
     return '/assets/' + encodeURIComponent(name) + '.webm';
@@ -409,14 +415,16 @@
   }
 
   function applyTheme() {
-    document.body.classList.toggle('dark', theme === 'dark');
+    document.body.classList.toggle('dark', theme === 'dark' || theme === 'amoled');
     document.body.classList.toggle('light', theme === 'light');
-    themeToggle.textContent = theme === 'dark' ? '浅' : '深';
-    themeToggle.title = theme === 'dark' ? '切到浅色背景' : '切到黑灰背景';
+    document.body.classList.toggle('amoled', theme === 'amoled');
+    themeToggle.textContent = theme === 'light' ? '深' : theme === 'dark' ? '黑' : '浅';
+    themeToggle.title = theme === 'light' ? '切到深色' : theme === 'dark' ? '切到纯黑 AMOLED' : '切到浅色';
   }
 
   themeToggle.addEventListener('click', () => {
-    theme = theme === 'dark' ? 'light' : 'dark';
+    const order = ['light', 'dark', 'amoled'];
+    theme = order[(order.indexOf(theme) + 1) % order.length];
     localStorage.setItem('dsh-pet.theme', theme);
     applyTheme();
     if (currentName) play(currentName, { force: true, reason: 'theme' });
