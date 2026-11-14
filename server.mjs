@@ -33,6 +33,7 @@ const SESSION_ROOT = path.join(DSH_HOME, 'sessions');
 const TOKEN_FILE = path.join(ROOT, '.token');
 const URL_FILE = path.join(ROOT, 'url.txt');
 const POLL_MS = Number(process.env.POLL_MS) || 200;
+const CLIENT_IDLE_MS = Number(process.env.CLIENT_IDLE_MS) || 15000;
 const TAIL_BYTES = 512 * 1024;
 
 fs.mkdirSync(DATA, { recursive: true });
@@ -579,6 +580,31 @@ function pollStatus() {
 /* ------------------------------------------------------------------ */
 
 const clients = new Set();
+let pollTimer = null;
+let lastClientAt = 0;
+
+/** 有页面/SSE 客户端时才启动 session 解析，空闲时完全停掉。 */
+function startPolling() {
+  lastClientAt = Date.now();
+  if (pollTimer) return;
+  pollStatus();
+  pollTimer = setInterval(() => {
+    try { pollStatus(); } catch (error) { console.error('[poll]', error.message); }
+  }, POLL_MS);
+  console.log('[dsh-pet-screen] client connected, polling started');
+}
+
+function stopPolling() {
+  if (!pollTimer) return;
+  clearInterval(pollTimer);
+  pollTimer = null;
+  console.log('[dsh-pet-screen] no clients, polling stopped');
+}
+
+function touchClient() {
+  lastClientAt = Date.now();
+  if (!pollTimer) startPolling();
+}
 
 function broadcast(status) {
   const payload = `data: ${JSON.stringify(status)}\n\n`;
@@ -592,6 +618,10 @@ setInterval(() => {
     try { res.write(': ping\n\n'); } catch { clients.delete(res); }
   }
 }, 15000).unref();
+
+setInterval(() => {
+  if (pollTimer && clients.size === 0 && Date.now() - lastClientAt > CLIENT_IDLE_MS) stopPolling();
+}, 5000).unref();
 
 /* ------------------------------------------------------------------ */
 /* HTTP                                                                */
@@ -767,6 +797,7 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (pathname === '/api/events') {
+      touchClient();
       res.writeHead(200, {
         'content-type': 'text/event-stream; charset=utf-8',
         'cache-control': 'no-store',
@@ -774,12 +805,14 @@ const server = http.createServer(async (req, res) => {
         'x-accel-buffering': 'no',
       });
       res.write('retry: 2000\n\n');
+      if (!latest) pollStatus();
       if (latest) res.write(`data: ${latestJSON}\n\n`);
       clients.add(res);
       req.on('close', () => clients.delete(res));
       return;
     }
     if (pathname === '/api/status') {
+      touchClient();
       const sessionId = url.searchParams.get('session');
       if (sessionId) {
         const file = findSessionFile(sessionId);
@@ -849,7 +882,7 @@ const server = http.createServer(async (req, res) => {
       const counts = [...animCounts.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count);
       return json(res, { ok: true, total: animTotal, counts, recent: animRecent.slice(-60) });
     }
-    if (pathname === '/api/health') return json(res, { ok: true, clients: clients.size });
+    if (pathname === '/api/health') return json(res, { ok: true, clients: clients.size, polling: !!pollTimer });
     if (pathname === '/manifest.webmanifest') {
       res.writeHead(200, { 'content-type': 'application/manifest+json; charset=utf-8', 'cache-control': 'no-store' });
       res.end(JSON.stringify({
@@ -875,11 +908,6 @@ const server = http.createServer(async (req, res) => {
     res.end('internal error');
   }
 });
-
-pollStatus();
-setInterval(() => {
-  try { pollStatus(); } catch (error) { console.error('[poll]', error.message); }
-}, POLL_MS).unref();
 
 server.listen(PORT, HOST, () => {
   const nets = os.networkInterfaces();
