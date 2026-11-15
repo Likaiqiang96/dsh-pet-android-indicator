@@ -58,12 +58,18 @@ const ZSTD_MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd]);
 const tailCache = new Map();
 
 /** 会话列表按「最后一次用户提问」排序，避免后台工具写入把别的会话顶上来。 */
+const promptCache = new Map();
 function lastPromptAt(sessionId) {
   try {
     const file = path.join(DSH_HOME, 'storages', 'session_projcache', 'sessions', `${sessionId}.json`);
+    const st = fs.statSync(file);
+    const cached = promptCache.get(sessionId);
+    if (cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size) return cached.value;
     const data = JSON.parse(fs.readFileSync(file, 'utf8'));
     const value = data?.record?.rows?.sessionListMetadata?.val?.lastPromptAt;
-    return typeof value === 'number' ? value : 0;
+    const result = typeof value === 'number' ? value : 0;
+    promptCache.set(sessionId, { mtimeMs: st.mtimeMs, size: st.size, value: result });
+    return result;
   } catch { return 0; }
 }
 
@@ -205,12 +211,18 @@ function shortTitle(title) {
   return value.length > 42 ? value.slice(0, 41) + '…' : value;
 }
 
+const titleCache = new Map();
 function cachedTitle(sessionId) {
   try {
     const file = path.join(DSH_HOME, 'storages', 'session_projcache', 'sessions', `${sessionId}.json`);
+    const st = fs.statSync(file);
+    const cached = titleCache.get(sessionId);
+    if (cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size) return cached.value;
     const data = JSON.parse(fs.readFileSync(file, 'utf8'));
     const title = data?.record?.rows?.title?.val;
-    return typeof title === 'string' ? title : '';
+    const result = typeof title === 'string' ? title : '';
+    titleCache.set(sessionId, { mtimeMs: st.mtimeMs, size: st.size, value: result });
+    return result;
   } catch { return ''; }
 }
 
