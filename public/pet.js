@@ -719,7 +719,7 @@
   function startPolling() {
     if (pollTimer) return;
     fetchStatus();
-    pollTimer = window.setInterval(fetchStatus, 150);
+    pollTimer = window.setInterval(fetchStatus, 1000);
   }
 
   async function loadBalance(force = false) {

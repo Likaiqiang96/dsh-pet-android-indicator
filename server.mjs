@@ -32,7 +32,7 @@ const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
 const SESSION_ROOT = path.join(DSH_HOME, 'sessions');
 const TOKEN_FILE = path.join(ROOT, '.token');
 const URL_FILE = path.join(ROOT, 'url.txt');
-const POLL_MS = Number(process.env.POLL_MS) || 200;
+const POLL_MS = Number(process.env.POLL_MS) || 1000;
 const CLIENT_IDLE_MS = Number(process.env.CLIENT_IDLE_MS) || 15000;
 const TAIL_BYTES = 512 * 1024;
 
@@ -356,7 +356,6 @@ function buildStatus(session, events) {
       detail: toolDetail(call.name, call.args),
       status: outcome ? (outcome.isError ? 'error' : 'done') : 'running',
       time: call.time,
-      output: outcome ? outcome.text.slice(-300) : '',
     };
   });
   const label = activeCall ? (TOOL_LABELS[activeCall.name] || activeCall.name) : '';
@@ -376,14 +375,13 @@ function buildStatus(session, events) {
     mood: state === 'done' ? 'happy' : state,
     active: ['thinking', 'working', 'waiting', 'error'].includes(state),
     headline,
-    thinking: lastReasoning,
-    finalText: lastText,
+    thinking: (lastReasoning || '').slice(-2000),
+    finalText: (lastText || '').slice(-1200),
     tool: activeCall ? {
       name: activeCall.name,
       label: label || activeCall.name,
       detail,
       running,
-      output: activeResult?.text?.slice(-1600) || '',
       isError: !!activeResult?.isError,
     } : null,
     step,
