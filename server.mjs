@@ -32,7 +32,7 @@ const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
 const SESSION_ROOT = path.join(DSH_HOME, 'sessions');
 const TOKEN_FILE = path.join(ROOT, '.token');
 const URL_FILE = path.join(ROOT, 'url.txt');
-const POLL_MS = Number(process.env.POLL_MS) || 1000;
+const POLL_MS = Number(process.env.POLL_MS) || 2000;
 const CLIENT_IDLE_MS = Number(process.env.CLIENT_IDLE_MS) || 15000;
 const TAIL_BYTES = 512 * 1024;
 
